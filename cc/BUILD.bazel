@@ -1,0 +1,37 @@
+load("@modular_cc_toolchain//cc:features.bzl", "cc_feature", "action_mux")
+
+load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
+
+cc_feature(
+    name = "garbage_collect_sections",
+    action_flags = action_mux({
+        # Put each function and global var in their own linker section.
+        (ACTION_NAMES.linkstamp_compile,
+         ACTION_NAMES.cpp_compile,
+         ACTION_NAMES.cpp_header_parsing,
+         ACTION_NAMES.cpp_module_compile,
+         ACTION_NAMES.cpp_module_codegen,
+         ACTION_NAMES.lto_backend,
+         ACTION_NAMES.clif_match,
+         ACTION_NAMES.c_compile,
+         ACTION_NAMES.preprocess_assemble,
+         ACTION_NAMES.assemble): ["-ffunction-sections", "-fdata-sections"],
+
+        # Remove unused functions/symbols from linked binary.
+        (ACTION_NAMES.cpp_link_executable,
+         ACTION_NAMES.cpp_link_dynamic_library,
+         ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+         ACTION_NAMES.lto_index_for_executable,
+         ACTION_NAMES.lto_index_for_dynamic_library,
+         ACTION_NAMES.lto_index_for_nodeps_dynamic_library): ["-Wl,--gc-sections"],
+    }),
+    doc = "Place each function in it's own section so that the linker can discard unused functions",
+)
+
+filegroup(
+    name = "bzl_srcs",
+    srcs = glob(["*.bzl"]),
+    visibility = ["//visibility:public"],
+)
+
+exports_files(glob(["*.bzl"]))
