@@ -1,17 +1,18 @@
 """A set of tools for constructing toolchains features in BUILD files"""
 
 load(
-      "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
-      "feature",
-      "flag_group",
-      "flag_set",
-      "tool_path",
-      "FeatureInfo",
+    "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
+    "FeatureInfo",
+    "feature",
+    "feature_set",
+    "flag_group",
+    "flag_set",
+    "tool_path",
 )
 
 def action_mux(action_map):
     """ Expands an iterable set of actions that map to a given flag. 
-    
+
     See cc_feature documentation for example usage.
     """
     action_flags = {}
@@ -20,14 +21,17 @@ def action_mux(action_map):
             action_flags[action] = action_flags.get(action, []) + flags
     return action_flags
 
-
 def _action_flags_as_flag_set(action, flags):
     return flag_set(
         actions = [action],
-        flag_groups = [flag_group(flags = flags)]
+        flag_groups = [flag_group(flags = flags)],
     )
 
 def _cc_feature_impl(ctx):
+    runfiles = ctx.runfiles(files = [])
+    for dep in ctx.attr.deps:
+        runfiles.merge(dep[DefaultInfo].default_runfiles)
+
     return [
         feature(
             name = str(ctx.label),
@@ -36,7 +40,14 @@ def _cc_feature_impl(ctx):
                 _action_flags_as_flag_set(action, flags)
                 for action, flags in ctx.attr.action_flags.items()
             ],
-        )
+        ),
+        DefaultInfo(
+            files = depset(transitive = [
+                dep[DefaultInfo].files
+                for dep in ctx.attr.deps
+            ]),
+            runfiles = runfiles,
+        ),
     ]
 
 cc_feature = rule(
@@ -51,6 +62,9 @@ cc_feature = rule(
         ),
         "doc": attr.string(
             doc = "Description of the purpose of this feature",
+        ),
+        "deps": attr.label_list(
+            doc = "The set of features that this feature implicitly enables/implies.",
         ),
     },
     provides = [FeatureInfo],
@@ -73,9 +87,8 @@ cc_feature(
     doc = "Place each function in it's own section so that the linker can discard unused functions",
 )
 ```
-"""
+""",
 )
-
 
 CcFeatureSettingInfo = provider(
     doc = """
@@ -87,12 +100,11 @@ only one compilation mode feature may be enabled at once, one of;
 """,
     fields = {
         "name": "The name of the configuration feature, e.g. compilation mode.",
-    }
+    },
 )
 
 def _cc_feature_setting_impl(ctx):
     return [CcFeatureSettingInfo(name = ctx.label.name)]
-
 
 cc_feature_setting = rule(
     _cc_feature_setting_impl,
