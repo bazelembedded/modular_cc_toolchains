@@ -19,8 +19,9 @@ stardoc_repositories()
 
 git_repository(
     name = "rules_cc",
-    commit = "92255eeefc515e21ab737205d6529aaee5bfb082",
-    remote = "https://github.com/silvergasp/rules_cc.git",
+    commit = "42f3259960ba2b7b350bafa50f104567883a49eb",
+    remote = "https://github.com/bazelbuild/rules_cc.git",
+    shallow_since = "1676631261 -0800",
 )
 
 http_archive(
