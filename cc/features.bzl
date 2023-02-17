@@ -1,13 +1,11 @@
 """A set of tools for constructing toolchains features in BUILD files"""
 
 load(
-    "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
+    "@rules_cc//cc:cc_toolchain_config_lib.bzl",
     "FeatureInfo",
     "feature",
-    "feature_set",
     "flag_group",
     "flag_set",
-    "tool_path",
 )
 
 def action_mux(action_map):
