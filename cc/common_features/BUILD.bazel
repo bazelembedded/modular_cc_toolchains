@@ -1,8 +1,6 @@
 load("@modular_cc_toolchain//cc:features.bzl", "cc_feature", "action_mux")
 load("//cc:action_names.bzl", "ACTION_NAME_GROUPS")
-load("//cc:actions.bzl", "cc_action_config")
 load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
-load("//cc:toolchain.bzl", "cc_toolchain_config")
 
 cc_feature(
     name = "garbage_collect_sections",
@@ -13,30 +11,26 @@ cc_feature(
         ACTION_NAME_GROUPS.all_cc_link_actions: ["-Wl,--gc-sections"],
     }),
     doc = "Place each function in it's own section so that the linker can discard unused functions",
-    deps = [":default_clang"],
 )
 
-cc_action_config(
-    name = "default_clang",
-    action_tools = {
-        ACTION_NAMES.c_compile: "@clang_llvm_x86_64_linux_gnu_ubuntu//:cc",
-    }
+cc_feature(
+    name = "dependency_file",
+    enabled = True,
+    action_flags = action_mux({
+        (ACTION_NAMES.assemble,
+        ACTION_NAMES.preprocess_assemble,
+        ACTION_NAMES.c_compile,
+        ACTION_NAMES.cpp_compile,
+        ACTION_NAMES.cpp_module_compile,
+        ACTION_NAMES.objc_compile,
+        ACTION_NAMES.objcpp_compile,
+        ACTION_NAMES.cpp_header_parsing,
+        ACTION_NAMES.clif_match): [
+            "-MD",
+            "-MF",
+            "%{dependency_file}",
+        ]
+    })
 )
 
-cc_toolchain_config(
-    name = "test_toolchain_config",
-    cc_features = [
-        ":garbage_collect_sections",
-    ],
-    action_configs = [
-        ":default_clang",
-    ]
-)
 
-filegroup(
-    name = "bzl_srcs",
-    srcs = glob(["*.bzl"]),
-    visibility = ["//visibility:public"],
-)
-
-exports_files(glob(["*.bzl"])) 
