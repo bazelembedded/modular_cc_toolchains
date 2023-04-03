@@ -1,25 +1,57 @@
-load("@modular_cc_toolchain//cc:features.bzl", "cc_feature", "action_mux")
+load("@modular_cc_toolchain//cc:features.bzl", "action_flag_mux", "cc_feature")
 load("//cc:action_names.bzl", "ACTION_NAME_GROUPS")
-load("//cc:actions.bzl", "cc_action_config")
+load("//cc:actions.bzl", "action_tool_mux", "cc_action_config")
+load("//cc:cc_toolchain_config.bzl", "cc_toolchain_config")
 load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
 
 cc_feature(
     name = "garbage_collect_sections",
-    action_flags = action_mux({
+    enabled = True,
+    action_flags = action_flag_mux({
         # Put each function and global var in their own linker section.
         ACTION_NAME_GROUPS.all_cc_compile_actions: ["-ffunction-sections", "-fdata-sections"],
         # Remove unused functions/symbols from linked binary.
         ACTION_NAME_GROUPS.all_cc_link_actions: ["-Wl,--gc-sections"],
     }),
     doc = "Place each function in it's own section so that the linker can discard unused functions",
-    deps = [":default_clang"],
+)
+
+cc_feature(
+    name = "no_std_includes",
+    enabled = True,
+    action_flags = action_flag_mux({
+        ACTION_NAME_GROUPS.all_cc_compile_actions: [
+            "-nostdinc",
+            "-nostdinc++",
+            "-isystem/usr/include/c++/9",
+            "-isystem/usr/include/x86_64-linux-gnu/c++/9",
+            "-isystem/usr/include/c++/9/backward",
+            "-isystem/usr/lib/gcc/x86_64-linux-gnu/9/include",
+            "-isystem/usr/local/include",
+            "-isystem/usr/include/x86_64-linux-gnu",
+            "-isystem/usr/include",
+        ],
+    }),
+    doc = "Don't use compiler builting include paths.",
+)
+
+cc_feature(
+    name = "link_cpp_stdlib",
+    enabled = True,
+    action_flags = {
+        ACTION_NAMES.cpp_link_executable: ["-lstdc++"],
+    },
 )
 
 cc_action_config(
     name = "default_clang",
     action_tools = {
         ACTION_NAMES.c_compile: "@clang_llvm_x86_64_linux_gnu_ubuntu//:bin/clang",
-    }
+        ACTION_NAMES.cpp_compile: "@clang_llvm_x86_64_linux_gnu_ubuntu//:bin/clang++",
+        ACTION_NAMES.linkstamp_compile: "@clang_llvm_x86_64_linux_gnu_ubuntu//:bin/clang",
+        ACTION_NAMES.cpp_link_static_library: "@clang_llvm_x86_64_linux_gnu_ubuntu//:bin/llvm-ar",
+        ACTION_NAMES.cpp_link_executable: "@clang_llvm_x86_64_linux_gnu_ubuntu//:bin/clang++",
+    },
 )
 
 filegroup(
@@ -28,4 +60,60 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
-exports_files(glob(["*.bzl"])) 
+exports_files(glob(["*.bzl"]))
+
+cc_toolchain_config(
+    name = "clang_config",
+    action_configs = [
+        ":default_clang",
+    ],
+    cc_features = [
+        ":garbage_collect_sections",
+        ":link_cpp_stdlib",
+        ":no_std_includes",
+    ],
+    cxx_builtin_include_directories = [
+        "/usr/include/c++/9",
+        "/usr/include/x86_64-linux-gnu/c++/9",
+        "/usr/include/c++/9/backward",
+        "/usr/lib/gcc/x86_64-linux-gnu/9/include",
+        "/usr/local/include",
+        "/usr/include/x86_64-linux-gnu",
+        "/usr/include",
+    ],
+)
+
+cc_toolchain(
+    name = "clang_toolchain",
+    toolchain_identifier = "empty",
+    toolchain_config = ":clang_config",
+    all_files = ":all_toolchain_files",
+    ar_files = ":all_toolchain_files",
+    compiler_files = ":all_toolchain_files",
+    dwp_files = ":all_toolchain_files",
+    linker_files = ":all_toolchain_files",
+    objcopy_files = ":all_toolchain_files",
+    strip_files = ":all_toolchain_files",
+    # TODO: This should be enabled for clang though it's easier to debug without it
+    supports_param_files = 0,
+    supports_header_parsing = 1,
+)
+
+filegroup(
+    name = "all_toolchain_files",
+    srcs = [":clang_config", "@clang_llvm_x86_64_linux_gnu_ubuntu//:all_files"],
+)
+
+toolchain(
+    name = "linux_clang",
+    exec_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    target_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    toolchain = ":clang_toolchain",
+    toolchain_type = "@rules_cc//cc:toolchain_type",
+)
