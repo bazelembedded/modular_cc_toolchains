@@ -2,13 +2,14 @@
 
 load(
     "@rules_cc//cc:cc_toolchain_config_lib.bzl",
-    "FeatureInfo",
+    "FeatureSetInfo",
     "feature",
+    "feature_set",
     "flag_group",
     "flag_set",
 )
 
-def action_mux(action_map):
+def action_flag_mux(action_map):
     """ Expands an iterable set of actions that map to a given flag. 
 
     See cc_feature documentation for example usage.
@@ -27,18 +28,21 @@ def _action_flags_as_flag_set(action, flags):
 
 def _cc_feature_impl(ctx):
     runfiles = ctx.runfiles(files = [])
-    for dep in ctx.attr.deps:
-        runfiles.merge(dep[DefaultInfo].default_runfiles)
-
-    return [
-        feature(
-            name = str(ctx.label),
+    this_feature = feature(
+            name = str(ctx.label.name),
             enabled = ctx.attr.enabled,
             flag_sets = [
                 _action_flags_as_flag_set(action, flags)
                 for action, flags in ctx.attr.action_flags.items()
             ],
-        ),
+        )    
+    dep_features = []
+    for dep in ctx.attr.deps:
+        runfiles.merge(dep[DefaultInfo].default_runfiles)
+        dep_features += dep[FeatureSetInfo].features
+
+    return [
+        feature_set([this_feature] + dep_features),
         DefaultInfo(
             files = depset(transitive = [
                 dep[DefaultInfo].files
@@ -65,7 +69,7 @@ cc_feature = rule(
             doc = "The set of features that this feature implicitly enables/implies.",
         ),
     },
-    provides = [FeatureInfo],
+    provides = [FeatureSetInfo],
     doc = """
 Configure a pipeline through each action in the C++ build.
 

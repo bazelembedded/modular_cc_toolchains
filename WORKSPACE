@@ -42,3 +42,5 @@ http_archive(
     build_file = "@//third_party:clang_llvm_x86_64_linux_gnu_ubuntu.BUILD",
     strip_prefix = "clang+llvm-15.0.6-x86_64-linux-gnu-ubuntu-18.04",
 )
+
+register_toolchains("//...")
